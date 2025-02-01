@@ -100,7 +100,7 @@ async def register_product(interaction: discord.Interaction, product_name: str, 
 
     embed = discord.Embed(
         title="제품 등록 완료",
-        description=f"제품 이름: `{product_name}`\n저장된 파일 경로: `{file_path}`",
+        description=f"제품 이름: {product_name}\n저장된 파일 경로: {file_path}",
         color=discord.Color.green()
     )
     await interaction.response.send_message(embed=embed)
@@ -109,75 +109,39 @@ async def register_product(interaction: discord.Interaction, product_name: str, 
     if log_channel:
         log_embed = discord.Embed(
             title="제품 등록 로그",
-            description=f"🛠️ {interaction.user}님이 `{product_name}` 제품을 등록했습니다.",
+            description=f"🛠️ {interaction.user}님이 {product_name} 제품을 등록했습니다.",
             color=discord.Color.blue()
         )
         await log_channel.send(embed=log_embed)
 
-# /제품지급 명령어 (관리자 전용)
+# /제품지급 (관리자 전용)
 @bot.tree.command(name="제품지급", description="특정 유저에게 제품을 지급합니다. (관리자 전용)")
 async def give_product(interaction: discord.Interaction, member: discord.Member, product_name: str):
     if not admin_only(interaction):
-        embed = discord.Embed(
-            title="권한 부족",
-            description="이 명령어는 관리자만 사용할 수 있습니다.",
-            color=discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        return
+        return await interaction.response.send_message("🚫 권한이 없습니다.", ephemeral=True)
 
-    # 응답을 지연시킴
-    await interaction.response.defer()  # 응답을 지연시키고, 잠시 후에 응답을 보냄
+    await interaction.response.defer()
 
-    # 제품 경로에서 파일을 찾음
     file_path = product_links.get(product_name)
     if file_path and os.path.exists(file_path):
         try:
-            # 임베드 메시지 생성
-            embed = discord.Embed(
-                title="구매 감사합니다.",
-                description=f"{member.mention}님에게 '{product_name}' 제품이 지급되었습니다.",
-                color=discord.Color.blue()
-            )
+            embed = discord.Embed(title="구매 감사합니다.", description=f"{member.mention}님에게 '{product_name}' 제품이 지급되었습니다.", color=discord.Color.blue())
+            message = await member.send(embed=embed)
 
-            # 임베드 메시지를 먼저 전송
-            await member.send(embed=embed)
-
-            # 파일을 유저에게 전송 (임베드 메시지 후)
             with open(file_path, "rb") as f:
-                await member.send(
-                    file=discord.File(f, os.path.basename(file_path))
-                )
+                file_message = await member.send(file=discord.File(f, os.path.basename(file_path)))
 
-            # 지급된 제품을 메시지로 기록 (다시 지급된 제품 기록)
+            # 지급된 제품 메시지 저장
             if member.id not in product_messages:
                 product_messages[member.id] = {}
-            product_messages[member.id][product_name] = file_path
+            product_messages[member.id][product_name] = file_message.id
 
-            confirm_embed = discord.Embed(
-                title="제품 지급 완료",
-                description=f"{member.mention}님에게 '{product_name}' 제품을 지급했습니다.",
-                color=discord.Color.green()
-            )
-
-            # 지연된 응답 후에 메시지 전송
-            await interaction.followup.send(embed=confirm_embed)
+            await interaction.followup.send(f"✅ {member.mention}님에게 '{product_name}' 지급 완료!")
 
         except discord.Forbidden:
-            error_embed = discord.Embed(
-                title="DM 전송 실패",
-                description=f"{member.mention}님에게 DM을 보낼 수 없습니다. DM이 비활성화된 것 같습니다.",
-                color=discord.Color.red()
-            )
-            await interaction.followup.send(embed=error_embed)
+            await interaction.followup.send("🚫 해당 유저가 DM을 비활성화했습니다.")
     else:
-        embed = discord.Embed(
-            title="제품 지급 실패",
-            description=f"'{product_name}' 제품이 존재하지 않거나 파일을 찾을 수 없습니다.",
-            color=discord.Color.red()
-        )
-        await interaction.followup.send(embed=embed)
-
+        await interaction.followup.send("⚠ 제품을 찾을 수 없습니다.")
 
 # /제품목록 명령어 (누구나 사용 가능)
 @bot.tree.command(name="제품목록", description="등록된 모든 제품의 목록을 확인합니다.")
@@ -185,7 +149,7 @@ async def product_list(interaction: discord.Interaction):
     if product_links:
         embed = discord.Embed(
             title="등록된 제품 목록",
-            description="\n".join([f"- `{name}`" for name in product_links.keys()]),
+            description="\n".join([f"- {name}" for name in product_links.keys()]),
             color=discord.Color.gold()
         )
     else:
@@ -220,7 +184,7 @@ async def delete_product(interaction: discord.Interaction, product_name: str):
 
         embed = discord.Embed(
             title="제품 삭제 완료",
-            description=f"제품 `{product_name}`이(가) 삭제되었습니다.",
+            description=f"제품 {product_name}이(가) 삭제되었습니다.",
             color=discord.Color.green()
         )
         await interaction.response.send_message(embed=embed)
@@ -229,7 +193,7 @@ async def delete_product(interaction: discord.Interaction, product_name: str):
         if log_channel:
             log_embed = discord.Embed(
                 title="제품 삭제 로그",
-                description=f"🛠️ {interaction.user}님이 `{product_name}` 제품을 삭제했습니다.",
+                description=f"🛠️ {interaction.user}님이 {product_name} 제품을 삭제했습니다.",
                 color=discord.Color.blue()
             )
             await log_channel.send(embed=log_embed)
@@ -241,17 +205,11 @@ async def delete_product(interaction: discord.Interaction, product_name: str):
         )
         await interaction.response.send_message(embed=embed)
 
-# /지급취소 명령어 (관리자 전용)
+# /지급취소 (관리자 전용)
 @bot.tree.command(name="지급취소", description="특정 유저에게 지급된 제품을 취소합니다. (관리자 전용)")
 async def cancel_give_product(interaction: discord.Interaction, member: discord.Member, product_name: str):
     if not admin_only(interaction):
-        embed = discord.Embed(
-            title="권한 부족",
-            description="이 명령어는 관리자만 사용할 수 있습니다.",
-            color=discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed, ephemeral=True)
-        return
+        return await interaction.response.send_message("🚫 권한이 없습니다.", ephemeral=True)
 
     user_messages = product_messages.get(member.id, {})
     message_id = user_messages.get(product_name)
@@ -260,41 +218,21 @@ async def cancel_give_product(interaction: discord.Interaction, member: discord.
         try:
             dm_channel = await member.create_dm()
             message = await dm_channel.fetch_message(message_id)
-            await message.delete()  # 메시지 삭제
+            await message.delete()  # 지급된 제품 메시지 삭제
 
-            # 기록에서 제거
             del user_messages[product_name]
             if not user_messages:
                 del product_messages[member.id]
 
-            cancel_embed = discord.Embed(
-                title="제품 지급 취소",
-                description=f"{member.mention}님에게 지급된 '{product_name}'이(가) 취소되었습니다.",
-                color=discord.Color.orange()
-            )
-            await interaction.response.send_message(embed=cancel_embed)
+            await interaction.response.send_message(f"🚨 {member.mention}님의 {product_name} 지급이 취소되었습니다.")
 
-            dm_embed = discord.Embed(
-                title="제품 지급 취소 알림",
-                description=f"'{product_name}' 제품의 지급이 취소되었습니다.",
-                color=discord.Color.red()
-            )
+            dm_embed = discord.Embed(title="제품 지급 취소", description=f"'{product_name}' 지급이 취소되었습니다.", color=discord.Color.red())
             await member.send(embed=dm_embed)
 
         except discord.NotFound:
-            error_embed = discord.Embed(
-                title="메시지 삭제 실패",
-                description=f"'{product_name}' 메시지를 찾을 수 없습니다. 이미 삭제되었을 수 있습니다.",
-                color=discord.Color.red()
-            )
-            await interaction.response.send_message(embed=error_embed)
+            await interaction.response.send_message("⚠ 지급된 제품 메시지를 찾을 수 없습니다.")
     else:
-        embed = discord.Embed(
-            title="제품 지급 취소 실패",
-            description=f"'{product_name}'에 대한 지급 기록이 없습니다.",
-            color=discord.Color.red()
-        )
-        await interaction.response.send_message(embed=embed)
+        await interaction.response.send_message("⚠ 해당 유저에게 지급된 제품이 없습니다.")
 
 # 봇 실행
 TOKEN = os.getenv('DISCORD_TOKEN')
